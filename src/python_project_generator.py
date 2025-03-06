@@ -391,30 +391,61 @@ Versión de Python: {self.python_version}
             abrir_vscode = input("\n¿Desea abrir el proyecto en VS Code? (s/N): ").strip().lower()
             if abrir_vscode == 's':
                 try:
-                    doc_path = self.project_path / "documentation.txt"
-                    if not doc_path.exists():
-                        print(f"\nError: No se encuentra el archivo documentation.txt")
-                        return True
-
-                    print("\nAbriendo documentation.txt en VS Code...")
+                    print("\nConfigurando VS Code para usar Conda en PowerShell...")
+                    
+                    # Crear configuración para VS Code con PowerShell
+                    vscode_settings_dir = self.project_path / ".vscode"
+                    vscode_settings_dir.mkdir(exist_ok=True)
+                    
+                    settings = {
+                        "terminal.integrated.defaultProfile.windows": "PowerShell",
+                        "terminal.integrated.profiles.windows": {
+                            "PowerShell": {
+                                "source": "PowerShell",
+                                "args": [
+                                    "-NoExit",
+                                    "-Command",
+                                    f"conda activate {self.project_name}"
+                                ]
+                            }
+                        }
+                    }
+                    
+                    # Guardar configuración
+                    with open(vscode_settings_dir / "settings.json", 'w') as f:
+                        import json
+                        json.dump(settings, f, indent=4)
+                    
                     if os.path.exists(vscode_path):
-                        # Abrir VS Code con el archivo específico y esperar a que se complete
-                        subprocess.run([vscode_path, "--wait", "--new-window", str(doc_path)], check=True)
-                        self.logger.info(f"VS Code abierto con documentation.txt: {doc_path}")
+                        # Abrir VS Code en una nueva ventana sin cerrar la actual
+                        subprocess.run([
+                            vscode_path,
+                            "--new-window",  # Forzar nueva ventana
+                            str(self.project_path),  # Abrir carpeta del proyecto
+                        ], check=True)
+                        
+                        # Esperar un momento y luego abrir documentation.txt
+                        import time
+                        time.sleep(2)
+                        doc_path = self.project_path / "documentation.txt"
+                        subprocess.run([
+                            vscode_path,
+                            "--reuse-window",
+                            str(doc_path)
+                        ], check=True)
+                        
+                        self.logger.info("VS Code abierto con terminal PowerShell y Conda")
                     else:
                         print(f"\nNota: VS Code no encontrado en {vscode_path}")
                         print("Intentando con el comando 'code' del PATH...")
-                        subprocess.run(['code', "--wait", "--new-window", str(doc_path)], check=True)
-                        self.logger.info("VS Code abierto con documentation.txt usando PATH")
+                        subprocess.run(['code', "--new-window", str(self.project_path)], check=True)
+                        time.sleep(2)
+                        subprocess.run(['code', "--reuse-window", str(doc_path)], check=True)
+                        self.logger.info("VS Code abierto usando PATH")
+
                 except Exception as e:
                     print(f"\nError al abrir VS Code: {e}")
                     self.logger.error(f"Error al abrir VS Code: {e}")
-                    # Intento alternativo con el programa predeterminado del sistema
-                    try:
-                        os.startfile(str(doc_path))
-                        self.logger.info("Archivo documentation.txt abierto con programa predeterminado")
-                    except Exception:
-                        print("\nNo se pudo abrir el archivo documentation.txt")
 
             self.logger.info("Post-proceso completado exitosamente")
             return True
